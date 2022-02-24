@@ -9,11 +9,12 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))##set working directo
 library(sf)
 library(rgdal)
 library(terra)
-library(dyplr)
 library(data.table)
 #load('.rdata')
 require(tidyverse)
-library(lubridate)
+library(lubridate) #time series
+library(plyr) #rbind.fill: rbind with different collumns and fill with NA
+library(data.table) #this helps with the order command
 
 ##
 ##load fire perimeter shape file
@@ -59,23 +60,11 @@ for (fire in 1:length(fire.vect)) {
 }
   }
 
-
-
-
-#method 1: extract pixel values for each fire year by fire perimeters
-#only fires that lie within the perimeter should be counted
-#potential source of error: counts pixel values that were not during period of ignition 
-system.time(
-for (i in 1:length(firerastls_raw)) {
-assign(names(firerastls_raw[[i]]), terra::extract(firerastls_raw[[i]], fire.vect))
-}
-)
-
-mtbs_severity.df.ls<-mget(ls(pattern="mtbs_CONUS_")) #list of all dataframes
-mtbs_severity_freq.tbl<-vector('list',length = 19) #create list for for loop
+mtbs_severity.df.ls<-mget(ls(pattern="fireID_")) #list of all data frames
+mtbs_severity_freq.tbl<-vector('list',length = length(mtbs_severity.df.ls)) #create list for for loop
 
 #MTBS band classification from metadata
-#1 Unburned/Underburned to Low Burn Severity Producer defined
+#1 Unburned / Underburned to Low Burn Severity Producer defined
 #2 Low burn severity
 #3 Moderate burn severity
 #4 High Burn Severity
@@ -89,28 +78,21 @@ for (i in 1:length(mtbs_severity.df.ls)) {
   mtbs_severity_freq.tbl[[i]]<-table(mtbs_severity.df.ls[[i]]) #use data.table for faster processing
 }
 )
+names(mtbs_severity_freq.tbl)<-names(mtbs_severity.df.ls)
 
-#turn tables into dataframes
+#turn tables into data_frames
 mtbs_severity_freq.df<-lapply(mtbs_severity_freq.tbl, as.data.frame.matrix)
 
 #making an ID column and moving it toward the front
 system.time(
   for (i in 1:length(mtbs_severity.df.ls)) {
-    mtbs_severity_freq.df[[i]]$ID<- row.names(mtbs_severity_freq.df[[i]])
-    mtbs_severity_freq.df[[i]]<-mtbs_severity_freq.df[[i]][,c(7,1:6)]
+    mtbs_severity_freq.df[[i]]$ID<-as.numeric(gsub("fireID_", "", names(mtbs_severity_freq.df[i])))
   }
 )
 
-mtbs_severity_combined<-reduce(mtbs_severity_freq.df, left_join, by='ID')
-
-prefixes = unique(sub("\\..*", "", colnames(mtbs_severity_combined)))#only uses the first number in each column name
-prefixes<- prefixes[2:7]
-burnseverity_total<-data.frame(sapply(prefixes, function(x) rowSums(mtbs_severity_combined[,startsWith(colnames(mtbs_severity_combined), x)])))
-
-#Adding ID number and naming bands
-burnseverity_total$ID<-c(1:75)
-burnseverity_total<-burnseverity_total[,c(7,1:6)]
-colnames(burnseverity_total)[2:7]<-c(1:6)
+mtbs_severity_combined<- do.call(rbind.fill, mtbs_severity_freq.df) #absolutely gorgeous 
+burnseverity_total <- mtbs_severity_combined[order(mtbs_severity_combined[, "ID"]), , drop = FALSE]
+burnseverity_total[is.na(burnseverity_total)] = 0
 
 #percentage of burn seversity classification
 severity_per<-function(x,y){x/sum(y)}
@@ -126,13 +108,12 @@ for (i in 1:dim(burnseverity_total)[1]) {
   
 }
 
-ordered_burnseverity<-setorder(burnseverity_total, -Hprop, -Mprop) #order by burn severity
 
 #Attaching to the shape file
 fire.vect$Hseverity<-burnseverity_total[,c('Hprop')]
 fire.vect$Mseverity<-burnseverity_total[,c('Mprop')]
 fire.vect$Lseverity<-burnseverity_total[,c('Lprop')]
 
-writeVector(fire.vect,"fire_severity.shp")
+writeVector(fire.vect,"fire_severity2.shp")
 
 
