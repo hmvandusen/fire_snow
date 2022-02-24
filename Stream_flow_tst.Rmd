@@ -1,0 +1,132 @@
+---
+title: "Streamflow and fire: Case study of "
+author: "Hannah"
+date: "1/13/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages('dataRetrieval')
+library(dataRetrieval) # packaage for downloading USGS stream flow data
+#install.packages('lubridate')
+library(lubridate) # date management
+library(forecast)
+library(stlplus)
+library(fpp)
+```
+
+## Downloading Stream flow Data
+
+Case study of Fawn Peek Fire Complex -- 6/30/2003
+USGS gage Station Name: ANDREWS CREEK NEAR MAZAMA, WA
+USGS gage ID: 12447390
+*note: gage will be discontinued by the usgs Oct 2022*
+
+
+```{r downloading data}
+# identifying parameters for data download
+siteNumber <- "11413000" # USGS gauge number
+parameterCd <- "00060"  # mean daily discharge in cfs
+startDate <- "1997-10-1" # ~ 5 years prefire: incorportating start of water year
+                          #(this is before MODIS data):if we wanted to be in MODIS timeframe it would be 3 years pre & post
+endDate <- "2008-10-1" # 5 years postfire
+
+# download data using readNWISdv function
+andrewcreek_10 <- dataRetrieval::readNWISdv(siteNumber, parameterCd, startDate, endDate)
+head(andrewcreek_10) # check
+colnames(andrewcreek_10)[4]<- 'discharge_cfs'
+andrewcreek_10<-andrewcreek_10[,-5]
+
+#Making time series in water year
+#I am seperating the date for each column 
+andrewcreek_10$year <-lubridate::year(andrewcreek_10$Date) # add year col
+andrewcreek_10$month <-lubridate::month(andrewcreek_10$Date) # add month col
+andrewcreek_10$day <-lubridate::day(andrewcreek_10$Date) # add day of month col
+andrewcreek_10$doy <-lubridate::yday(andrewcreek_10$Date) # add day of year col
+andrewcreek_10 <-dataRetrieval::addWaterYear(andrewcreek_10)
+firedate<-ymd('2003-06-30')
+
+
+
+```
+
+## Timeseries Plots
+
+```{r pressure, echo=FALSE}
+#Plots of all years from 1998 - 2008
+plot(andrewcreek_10$Date, andrewcreek_10$discharge_cfs, type='l', ylab='Discharge (cfs)', xlab='Time (days)')
+abline(v=as.Date('2003-06-30'), col='red')
+
+#Plots of just water year 2003
+
+plot(andrewcreek_10[andrewcreek_10$Date>=as.Date('2003-10-01') & andrewcreek_10$Date<=as.Date('2004-10-01'),]$Date, andrewcreek_10[andrewcreek_10$Date>=as.Date('2003-10-01') & andrewcreek_10$Date<=as.Date('2004-10-01'),]$discharge_cfs, type='l', ylab='Discharge (cfs)', xlab='Time (days)')
+abline(v=as.Date('2003-06-30'), col='red')
+
+
+```
+#All years of stream data
+
+The steam gage has data from 1989-10-01 to today's date
+```{r}
+# identifying parameters for data download
+siteNumber <- "11413000" # USGS gauge number
+parameterCd <- "00060"  # mean daily discharge in cfs
+startDate <- "1989-10-1" # ~ 5 years prefire: incorportating start of water year
+                          #(this is before MODIS data):if we wanted to be in MODIS timeframe it would be 3 years pre & post
+endDate <- "2021-01-13" # 5 years postfire
+
+# download data using readNWISdv function
+andrewcreek_all <- dataRetrieval::readNWISdv(siteNumber, parameterCd, startDate, endDate)
+head(andrewcreek_all) # check
+colnames(andrewcreek_all)[4]<- 'discharge_cfs'
+andrewcreek_all<-andrewcreek_all[,-5]
+
+#Making time series in water year
+#I am seperating the date for each column 
+andrewcreek_all$year <-lubridate::year(andrewcreek_all$Date) # add year col
+andrewcreek_all$month <-lubridate::month(andrewcreek_all$Date) # add month col
+andrewcreek_all$day <-lubridate::day(andrewcreek_all$Date) # add day of month col
+andrewcreek_all$doy <-lubridate::yday(andrewcreek_all$Date) # add day of year col
+andrewcreek_all <-dataRetrieval::addWaterYear(andrewcreek_all)
+
+andrewcreek_all <- as.data.frame(dplyr::group_by(andrewcreek_all,waterYear) 
+                      %>% mutate(dowy = seq(1:n())))
+
+plot(andrewcreek_all$Date, andrewcreek_all$discharge_cfs, type='l', ylab='Discharge (cfs)', xlab='Time (days)')
+```
+##Find stream flow metrics
+
+*Date on spring onset (Painter et al 2017)*
+The onset of the rising limb is calculated here as the date on which the deviation from the running mean flow since 1 January, or date of first measurement, exceeds 1% (Figure S2). Peak flow in these rivers generally occurs sometime during the second half of May and the first half of June.
+
+```{r}
+
+andrewcreek2003<-andrewcreek_all[andrewcreek_all$year == 2003,] 
+runningmean<-function(dataset,x){sum(dataset$discharge_cfs[1:x])/x}
+andrewcreek2003$runmean<-NA
+for (i in 1:length(andrewcreek2003$year)) {
+  andrewcreek2003$runmean[i]<-runningmean(andrewcreek2003,i)
+}
+plot(andrewcreek2003$dowy,andrewcreek2003$runmean, type='l')
+
+andrewcreek2003$permeanchange<-NA
+for (i in 2:length(andrewcreek2003$year)){
+andrewcreek2003$permeanchange[i]<-abs(1-andrewcreek2003$runmean[i]/andrewcreek2003$runmean[i-1])
+}
+plot(andrewcreek2003$dowy,andrewcreek2003$permeanchange, type='o')
+
+```
+##Creating a time series object with the ts package
+
+```{r}
+andrewcreek.ts<-ts(andrewcreek_all$discharge_cfs, start = c(1989,10), end = c(2022,01), frequency = 365)
+
+plot(andrewcreek.ts)
+andrews_add = decompose(andrewcreek.ts, type = 'additive') #The moving average window is unknown
+plot(andrews_add)
+
+#Just see one seasonal trend
+plot(andrews_add$seasonal[1:365],type="l") #This seasonal trend is more gradual starting in mid-February and peaking in February
+```
+
