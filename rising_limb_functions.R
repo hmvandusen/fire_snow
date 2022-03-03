@@ -11,24 +11,30 @@ library(fpp)
 library(dplyr)
 library(reshape2)
 
-
+#Test 1: 
+#Badger Creek near Browning MT: 
+#Fire occurred:2007-07-31
 
 #Objects that change
 #Additionally object to change and save product at bottom 
 
+
 # Pull in gage for fire identifying parameters for data download
-siteNumber <- "13313000" # USGS gauge number
+siteNumber <- "06092500" # USGS gauge number
+fire_year<- 2007
 parameterCd <- "00060"  # mean daily discharge in cfs
 startDate <- "2000-01-01" # period of record of MODIS
 endDate <- "2021-12-31" # Current year
 
 #window to plot in function: suggested window year 1 after fire 
-plot_date<- c("2000-01-01", "2000-12-31")
-
-
-
+plot_date<- c("2021-01-01", "2021-12-31")
+parameterCd <- "00060"  # mean daily discharge in cfs
+startDate <- "2000-01-01" # period of record of MODIS
+endDate <- "2021-12-31" # Current year
 #####
 ###Objects that do not change
+
+
 #### Cleaning in Gage data 
 
 # download data using readNWISdv function
@@ -142,10 +148,23 @@ for (i in 1:length(watershed_allyears.ls)) {
 
 
 plot(streamflow_metrics$year, streamflow_metrics$peakflow_cfs, type = "l")
-abline(v= 2007, col="red")
+abline(v= fire_year, col="red")
+
+
+
+#This puts the wrong year on the dates, but it don't matter for plotting purposes
+streamflow_metrics$springonset_md<-as.Date(format(streamflow_metrics$springonset_date, format="%m-%d"), "%m-%d")
+plot(streamflow_metrics$springonset_md, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     pch=19,  xlab = "Day of spring onset", ylab="Mean hydrograph slope (cfs/day)")
+plot(streamflow_metrics$peakflow_cfs, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     xlab = "Peak streamflow (cfs)", ylab="Mean hydrograph slope", pch = 19)
+plot(streamflow_metrics$springonset_md, streamflow_metrics$peakflow_cfs, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     xlab = "Day of spring onset", ylab="Peak streamflow (cfs)", pch = 19)
+
 
 
 ###SAVE streamflow_metrics table as a more specific name!####
-#Example: johnsoncreek_streamflow_metrics<-streamflow_metrics
-          #write.csv(johnsoncreek_streamflow_metrics, "johnsoncreek_streamflow_metrics.csv")
+#Example: 
+#MFrockCr_streamflow_metrics<-streamflow_metrics
+#write.csv(MFrockCr_streamflow_metrics, "./streamflow_metrics/johnsoncreek_streamflow_metrics.csv")
 
