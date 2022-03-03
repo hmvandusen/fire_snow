@@ -1,7 +1,7 @@
 ##This script clips mean SCF to a minimum of 25%
 ##Then clips fire shapefiles that lie in reference watersheds to the established 25% snowzone
 #Hannah Van Dusen
-
+ss
 library(terra)
 library(raster)
 library(sp)

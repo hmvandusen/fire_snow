@@ -102,6 +102,7 @@ names(johnsoncreek_10.ts.MA.df)[1]<-c('ma30')
 n<-dim(johnsoncreek_10)[1]
 johnsoncreek_10.ts.MA.df$Date<-johnsoncreek_10$Date[1:(n-3)]
 
+johnsoncreek_10_noleapday<-johnsoncreek_10[-(johnsoncreek_10$month == 2 & johnsoncreek_10$day == 29),]
 #this is a weird step but the ts object drops the last 3 entries, so I am just dropping it for all entries
 johnsoncreek_10.2<-full_join(johnsoncreek_10[(1:(n-3)),],johnsoncreek_10.ts.MA.df[,c("ma30","Date")])
 
@@ -111,9 +112,64 @@ plot(johnsoncreek_10.2$Date,johnsoncreek_10.2$rollmean, type='l', col='red', xli
 lines(johnsoncreek_10.2$Date, johnsoncreek_10.2$ma30)
 
 
+#Plot of year 1 after fire
+plot(johnsoncreek_10.2$Date,johnsoncreek_10.2$rollmean, type='l', col='red', xlim=as.Date(c("2008-01-01", "2008-12-31")))
+lines(johnsoncreek_10.2$Date, johnsoncreek_10.2$ma30)
+## Moving average is much sooner than the rolling average. This will provide you with a very different date
+
+##
+##Painter et al. Rising Limb
+#Running mean flow since 1 January
+johnsoncreek_10.2$year.fact<-as.factor(johnsoncreek_10.2$year)
+
 ####
 ####
 ##Calculating change in rolling/running/moving average 
+
+
+#removing leap years
+johnsoncreek_10_LD<-johnsoncreek_10.2[!(johnsoncreek_10.2$month == 2 & johnsoncreek_10.2$day == 29),]
+
+# loop to calculate running mean
+yeartable<-summary(johnsoncreek_10_LD$year.fact)#number of years to consider: ex. 11 years
+for (j in 1:length(yeartable)) {
+ 
+   for (i in 1:365) {
+    johnsoncreek_10_LD$runmeanPainter[(j*365-365)+i]<-sum(johnsoncreek_10_LD$discharge_cfs[((j*365-365)+1):((j*365-365)+i)])/i
+   }
+  
+  
+}
+
+
+plot(johnsoncreek_10_LD$Date,johnsoncreek_10_LD$rollmean, type='l', col='red', xlim=as.Date(c("2007-12-27", "2009-01-02")), ylim = c(0,5000))
+lines(johnsoncreek_10_LD$Date, johnsoncreek_10_LD$ma30)
+lines(johnsoncreek_10_LD$Date, johnsoncreek_10_LD$discharge_cfs, col='blue')
+lines(johnsoncreek_10_LD$Date, johnsoncreek_10_LD$runmeanPainter, col='green')
+
+##Find percent change of Painter running mean:
+
+for (i in 2:dim(johnsoncreek_10_LD)[1]) {
+  johnsoncreek_10_LD$perchange[1]<-NA
+  johnsoncreek_10_LD$perchange[i]<- ((johnsoncreek_10_LD$runmeanPainter)[i]/johnsoncreek_10_LD$runmeanPainter[i-1]*100)-100
+  #johnsoncreek_10_LD$perchange[i]<- -(((johnsoncreek_10_LD$runmeanPainter)[i-1]/johnsoncreek_10_LD$runmeanPainter[i]*100)-100)
+  
+}
+
+plot(johnsoncreek_10_LD$Date, johnsoncreek_10_LD$perchange, type='l', col='red', xlim=as.Date(c("2008-01-01", "2008-12-31")), ylim = c(0,20))
+lines(johnsoncreek_10_LD$Date, johnsoncreek_10_LD$runmeanPainter, col='green')
+abline(h=1)
+
+#Find date of spring onset: Where daily percent change of running mean is above 1 and after February
+date<-johnsoncreek_10_LD[johnsoncreek_10_LD$perchange >= 1 & johnsoncreek_10_LD$month > 2  ,]$Date[1]
+peakflow<-max(johnsoncreek_10_LD$discharge_cfs)
+
+#Find mean slope from start to peak flow 
+meanslope<- peakflow - johnsoncreek_10_LD[johnsoncreek_10_LD$Date == as.Date(date), ]$discharge_cfs/ 
+  johnsoncreek_10_LD[johnsoncreek_10_LD$discharge_cfs == peakflow, ]$doy - johnsoncreek_10_LD[johnsoncreek_10_LD$Date == as.Date(date), ]$doy
+
+meanslope_rollav<- max(johnsoncreek_10_LD$rollmean) - johnsoncreek_10_LD[johnsoncreek_10_LD$Date == as.Date(date), ]$rollmean/ 
+  johnsoncreek_10_LD[johnsoncreek_10_LD$rollmean == max(johnsoncreek_10_LD$rollmean), ]$doy - johnsoncreek_10_LD[johnsoncreek_10_LD$Date == as.Date(date), ]$doy
 
 
 
