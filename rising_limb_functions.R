@@ -10,30 +10,28 @@ library(stlplus)
 library(fpp)
 library(dplyr)
 library(reshape2)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 #Test 1: 
-#Badger Creek near Browning MT: 
-#Fire occurred:2007-07-31
+#Fawn Creek Complex: Andrews Creek near Mazama 
+#Fire occurred:2003
 
-#Objects that change
-#Additionally object to change and save product at bottom 
 
+#####
+#Objects that change:: additional object to change and save product at bottom of script
 
 # Pull in gage for fire identifying parameters for data download
-siteNumber <- "06092500" # USGS gauge number
-fire_year<- 2007
-parameterCd <- "00060"  # mean daily discharge in cfs
-startDate <- "2000-01-01" # period of record of MODIS
-endDate <- "2021-12-31" # Current year
+siteNumber <- '12374250' # USGS gauge number
+fire_year <- 2007
+
+
+###Objects that do not change#### 
 
 #window to plot in function: suggested window year 1 after fire 
 plot_date<- c("2021-01-01", "2021-12-31")
 parameterCd <- "00060"  # mean daily discharge in cfs
 startDate <- "2000-01-01" # period of record of MODIS
 endDate <- "2021-12-31" # Current year
-#####
-###Objects that do not change
-
 
 #### Cleaning in Gage data 
 
@@ -133,6 +131,7 @@ for (i in 1:length(watershed_allyears.ls)) {
   streamflow_metrics$springonset_date[i]<- date[1]
   
   peakflow<-max(watershed_allyears.ls[[i]]$discharge_cfs)
+  streamflow_metrics$peakflow_cms[i]<-peakflow*0.0283168
   streamflow_metrics$peakflow_cfs[i]<-peakflow
   
   #Find mean slope from start to peak flow 
@@ -141,30 +140,88 @@ for (i in 1:length(watershed_allyears.ls)) {
   
   max_ma30<-max(watershed_allyears.ls[[i]]$ma30, na.rm=T)
   streamflow_metrics$max_ma30[i]<-max_ma30
-  #Fix this I don't know why it isn't working !
-  #streamflow_metrics$meanslope_ma30[i]<- (max_ma30 - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$ma30)/ (watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$ma30 == max_ma30, ]$doy - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$doy)
+  
+  streamflow_metrics$meanslope_ma[i]<- (max_ma30 - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == date, ]$ma30)/(na.omit(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$ma30 == max_ma30, ]$doy) - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$doy)
+  
+  streamflow_metrics$annual_tot[i]<-sum(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
+  streamflow_metrics$annual_mean[i]<-mean(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
+  
+  
 
-}
+} #moving average mean slope is still not working 
 
-
-plot(streamflow_metrics$year, streamflow_metrics$peakflow_cfs, type = "l")
-abline(v= fire_year, col="red")
-
-
-
-#This puts the wrong year on the dates, but it don't matter for plotting purposes
-streamflow_metrics$springonset_md<-as.Date(format(streamflow_metrics$springonset_date, format="%m-%d"), "%m-%d")
-plot(streamflow_metrics$springonset_md, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
-     pch=19,  xlab = "Day of spring onset", ylab="Mean hydrograph slope (cfs/day)")
-plot(streamflow_metrics$peakflow_cfs, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
-     xlab = "Peak streamflow (cfs)", ylab="Mean hydrograph slope", pch = 19)
-plot(streamflow_metrics$springonset_md, streamflow_metrics$peakflow_cfs, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
-     xlab = "Day of spring onset", ylab="Peak streamflow (cfs)", pch = 19)
-
+plot(streamflow_metrics$year, streamflow_metrics$peakflow_cfs, type = "l", xlab="Time", ylab='Streamflow (cfs)')
+abline(v= fire_year, col="red", lwd =3)
 
 
 ###SAVE streamflow_metrics table as a more specific name!####
 #Example: 
 #MFrockCr_streamflow_metrics<-streamflow_metrics
 #write.csv(MFrockCr_streamflow_metrics, "./streamflow_metrics/johnsoncreek_streamflow_metrics.csv")
+
+##
+##
+##Plots for all Years
+
+#Notes:
+#Wrong year on springonset_md, but it don't matter for plotting purposes: just want month and day
+#Red Post fire, Blue Pre-Fire
+streamflow_metrics$springonset_md<-as.Date(format(streamflow_metrics$springonset_date, format="%m-%d"), "%m-%d")
+plot(streamflow_metrics$springonset_md, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     pch=19,  xlab = "Day of spring onset", ylab="Mean hydrograph slope (cfs/day)", cex= 4)
+plot(streamflow_metrics$peakflow_cfs, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     xlab = "Peak streamflow (cfs)", ylab="Mean hydrograph slope", pch = 19)
+plot(streamflow_metrics$springonset_md, streamflow_metrics$peakflow_cfs, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
+     xlab = "Day of spring onset", ylab="Peak streamflow (cfs)", pch = 19, cex=4)
+
+#Plots with gradient color
+#Darker colors mean year closer to fire
+library(RColorBrewer)
+precols<-brewer.pal(4,"Blues")
+postcols<-rev(brewer.pal(4,"Reds"))
+prepal<-colorRampPalette(precols)
+postpal<-colorRampPalette(postcols)
+
+par(bg="white") # This series of code makes just plot back ground grey and outside white: for better contrast
+plot(streamflow_metrics$springonset_md, streamflow_metrics$meanslope,
+     xlab = "Day of spring onset", 
+     ylab="Mean hydrograph slope (cfs/day)")
+rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col = "grey")
+par(new = TRUE)
+points(streamflow_metrics$springonset_md, streamflow_metrics$meanslope, 
+     col = ifelse(streamflow_metrics$year>fire_year, 
+     postpal(10)[as.numeric(cut(streamflow_metrics[streamflow_metrics$year>fire_year,]$year, breaks = 10))],
+     "turquoise3"), 
+     pch=19, cex=2)
+##gradient pre fire colors:: prepal(10)[as.numeric(cut(streamflow_metrics[streamflow_metrics$year<fire_year,]$year, breaks = 10))]) 
+
+
+#Bar plot of mean hydro graph slope, colored by pre and post fire
+streamflow_metrics_slopeordered<-streamflow_metrics[order(streamflow_metrics$meanslope, decreasing = T),]
+barplot(streamflow_metrics_slopeordered$meanslope, breaks = 50, col = ifelse(streamflow_metrics_slopeordered$year>fire_year, 
+    postpal(10)[as.numeric(cut(streamflow_metrics_slopeordered[streamflow_metrics_slopeordered$year>fire_year,]$year, breaks = 10))],
+    prepal(10)[as.numeric(cut(streamflow_metrics_slopeordered[streamflow_metrics_slopeordered$year<fire_year,]$year, breaks = 10))]),
+     xlab = "Mean slope")
+
+#Table of top 6 years with the largest mean slope
+head(streamflow_metrics_slopeordered)
+
+#Barplot of top years 
+streamflow_metrics_3y<-streamflow_metrics[streamflow_metrics$year>(fire_year-4) & streamflow_metrics$year<(fire_year+4),]
+barplot(streamflow_metrics_3y$springonset_date, breaks = 50, col = ifelse(streamflow_metrics_3y$year>fire_year, 
+      postpal(3)[as.numeric(cut(streamflow_metrics_3y[streamflow_metrics_3y$year>fire_year,]$year, breaks = 3))],
+      prepal(4)[as.numeric(cut(streamflow_metrics_3y[streamflow_metrics_3y$year<fire_year,]$year, breaks = 4))]),
+      xlab = "Mean slope")
+
+#Mean date of spring onset (mean slope is pretty much the same)
+mean(na.omit(streamflow_metrics[streamflow_metrics$year <= fire_year,]$springonset_md))
+mean(na.omit(streamflow_metrics[streamflow_metrics$year > fire_year & streamflow_metrics$year <= fire_year+3,]$springonset_md))
+
+mean(na.omit(streamflow_metrics[streamflow_metrics$year <= fire_year,]$max_ma30))
+mean(na.omit(streamflow_metrics[streamflow_metrics$year > fire_year & streamflow_metrics$year <= fire_year+3,]$max_ma30))
+
+#mean(na.omit(streamflow_metrics_precip[streamflow_metrics_precip$year <= fire_year,]$rration_maPeak))
+#mean(na.omit(streamflow_metrics_precip[streamflow_metrics_precip$year > fire_year & streamflow_metrics_precip$year <= fire_year+3,]$rration_maPeak))
+
+
 

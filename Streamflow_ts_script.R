@@ -113,9 +113,13 @@ lines(johnsoncreek_10.2$Date, johnsoncreek_10.2$ma30)
 
 
 #Plot of year 1 after fire
-plot(johnsoncreek_10.2$Date,johnsoncreek_10.2$rollmean, type='l', col='red', xlim=as.Date(c("2008-01-01", "2008-12-31")))
+plot(johnsoncreek_10.2$Date,johnsoncreek_10.2$rollmean, type='l', col='red', xlim=as.Date(plot_date))
 lines(johnsoncreek_10.2$Date, johnsoncreek_10.2$ma30)
+lines(johnsoncreek_10.2$Date, johnsoncreek_10.2$rollmean2, col='blue')
 ## Moving average is much sooner than the rolling average. This will provide you with a very different date
+
+
+
 
 ##
 ##Painter et al. Rising Limb

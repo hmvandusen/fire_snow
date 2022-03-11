@@ -105,7 +105,6 @@ for (i in 1:dim(burnseverity_total)[1]) {
   burnseverity_total$Hprop[i]<- severity_per(burnseverity_total$`4`[i], burnseverity_total[i,c('1','2','3','4')])
   burnseverity_total$Mprop[i]<-severity_per(burnseverity_total$`3`[i], burnseverity_total[i,c('1','2','3','4')])
   burnseverity_total$Lprop[i]<-severity_per(burnseverity_total$`2`[i], burnseverity_total[i,c('1','2','3','4')])
-  
 }
 
 
@@ -116,4 +115,8 @@ fire.vect$Lseverity<-burnseverity_total[,c('Lprop')]
 
 writeVector(fire.vect,"fire_severity2.shp")
 
+fire_severity<-vect('/Volumes/MJ_INFEWS/Hannah Files/Fire_stream_flow/fire_severity2.shp')
+mean(fire_severity$Hseverity)
+mean(fire_severity$Mseverity)
+mean(fire_severity$Lseverity)
 
