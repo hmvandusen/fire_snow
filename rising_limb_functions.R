@@ -5,12 +5,12 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dataRetrieval) # packaage for downloading USGS stream flow data
 #install.packages('lubridate')
 library(lubridate) # date management
-library(forecast)
-library(stlplus)
-library(fpp)
-library(dplyr)
-library(reshape2)
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+library(forecast) 
+library(stlplus) 
+library(fpp) 
+library(dplyr) 
+library(reshape2) 
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) 
 
 #Test 1: 
 #Fawn Creek Complex: Andrews Creek near Mazama 
@@ -223,5 +223,14 @@ mean(na.omit(streamflow_metrics[streamflow_metrics$year > fire_year & streamflow
 #mean(na.omit(streamflow_metrics_precip[streamflow_metrics_precip$year <= fire_year,]$rration_maPeak))
 #mean(na.omit(streamflow_metrics_precip[streamflow_metrics_precip$year > fire_year & streamflow_metrics_precip$year <= fire_year+3,]$rration_maPeak))
 
+#creating a factor for before fire and 3 years after fire
+
+streamflow_metrics$before_after_f<- as.factor(with(streamflow_metrics, ifelse( year <= fire_year, 'prefire', 
+                                                                               ifelse(year > fire_year & streamflow_metrics$year <= fire_year+3, 'postfire_3yr', 
+                                                                                      'postfire'))))
+boxplot(springonset_md ~ before_after_f, data = streamflow_metrics)
+boxplot(meanslope ~ before_after_f, data = streamflow_metrics, ylim = c(0,7))
+boxplot(meanslope_ma ~ before_after_f, data = streamflow_metrics)
+boxplot(peakflow_cms ~ before_after_f, data = streamflow_metrics)
 
 
