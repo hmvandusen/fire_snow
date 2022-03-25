@@ -118,10 +118,11 @@ assign(paste0("watershed_", yearperiod$year[1]), yearperiod, envir = globalenv()
 
 }
 
-
+###Application of functions 
 watershed_allyears<-streamflow_analysis(siteNumber, parameterCd, startDate, endDate)
 watershed_allyears.ls<-lapply(watershed_allyears, function(y) eachyear(y))
 
+#Creating a usable dataframe and following for loop
 streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA), peakflow_cfs=NA, meanslope=NA, meanslope_ma=NA)
 
 for (i in 1:length(watershed_allyears.ls)) {
@@ -147,6 +148,9 @@ for (i in 1:length(watershed_allyears.ls)) {
   streamflow_metrics$annual_mean[i]<-mean(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
   
   
+  streamflow_metrics$annual_mean[i]<-mean(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
+  
+  streamflow_metrics$baseflow[i]<-median(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$month == 8,]$discharge_cfs)*0.0283168
 
 } #moving average mean slope is still not working 
 
@@ -233,4 +237,14 @@ boxplot(meanslope ~ before_after_f, data = streamflow_metrics, ylim = c(0,7))
 boxplot(meanslope_ma ~ before_after_f, data = streamflow_metrics)
 boxplot(peakflow_cms ~ before_after_f, data = streamflow_metrics)
 
+#Niceer looking ggplots 
+ggplot(streamflow_metrics %>% filter(!is.na(before_after_f)), 
+       aes(x=before_after_f, y=baseflow, fill=before_after_f)) + 
+  geom_boxplot(alpha=0.3) +
+  theme(legend.position="none") +
+  scale_fill_brewer(palette="Dark2") +
+  xlab( "Pre or Post Fire") + ylab('baseflow') 
 
+
+  
+  

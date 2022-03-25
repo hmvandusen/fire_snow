@@ -32,27 +32,18 @@ abline(v=as.Date('2007-07-17'), col='red')
 
 snotel_analysis<-function(snotel.df){
 
+  #changing names for more simple coding
+  colnames(snotel.df)<-c('Date', 'swe', 'precip_acc', 'temp_max', 'temp_min', 'temp_avg', 'precip_inc')
+  snotel.df$stationID <- 439
   
   #Making time series in water year
   #I am separating the date for each column 
   snotel.df$year <-lubridate::year(snotel.df$Date) # add year col
   snotel.df$month <-lubridate::month(snotel.df$Date) # add month col
   snotel.df$day <-lubridate::day(snotel.df$Date) # add day of month col
-  snotel.df$doy <-lubridate::yday(snotel.df$Date) # add day of year col
+  snotel.df$doy <-lubridate::yday(snotel.df$Date)# add day of year col
+  snotel.df$wy<- lubridate::wy(snotel.df$Date)
   
- 
-  #Check for missing days, if so, add NA rows:
-  if(as.numeric(diff(range(snotel.df$Date))) != (nrow(snotel.df)+1)){
-    fullDates <- seq(from=min(snotel.df$Date),
-                     to = max(snotel.df$Date), by="1 day")
-    fullDates <- data.frame(Date = fullDates, 
-                            agency_cd = snotel.df$agency_cd[1],
-                            site_no = snotel.df$site_no[1],
-                            stringsAsFactors = FALSE)
-    snotel.df <- full_join(snotel.df, fullDates,
-                                by=c("Date")) %>%
-      arrange(Date)
-  }
   
   snotel.df$year.fact<-as.factor(snotel.df$year)
   snotel_ls<<-split(snotel.df, snotel.df$year.fact)
@@ -106,37 +97,74 @@ eachyear<-function(yearperiod){
   
 }
 
+#Application of functions 
+snotel_allyears<-snotel_analysis(Snotel_2000_2022)
 
-watershed_allyears<-streamflow_analysis(siteNumber, parameterCd, startDate, endDate)
-watershed_allyears.ls<-lapply(watershed_allyears, function(y) eachyear(y))
+#not sure if this is necessary
+#watershed_allyears.ls<-lapply(watershed_allyears, function(y) eachyear(y))
 
-streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA), peakflow_cfs=NA, meanslope=NA, meanslope_ma=NA)
+#Creating a usable data frame
+snotel_metrics<-data.frame(time= 1:23,year=NA, peak_date=as.Date(NA), peakswe_mm=NA, time_of_melt=as.Date(NA), slope_melt=NA)
 
-for (i in 1:length(watershed_allyears.ls)) {
-  streamflow_metrics$year[i]<-watershed_allyears.ls[[i]]$year[1]
+for (i in 1:length(snotel_allyears)) {
+  snotel_metrics$year[i]<-snotel_allyears[[i]]$year[1]
   
-  date<-watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$perchange >= 1 & watershed_allyears.ls[[i]]$month > 2  ,]$Date[1]
-  streamflow_metrics$springonset_date[i]<- date[1]
+  peak_swe<- max(snotel_allyears[[i]]$swe)
+  snotel_metrics$peakswe_mm[i]<-peak_swe*25.4
+  snotel_metrics$peak_swe_in[i]<-peak_swe
   
-  peakflow<-max(watershed_allyears.ls[[i]]$discharge_cfs)
-  streamflow_metrics$peakflow_cms[i]<-peakflow*0.0283168
-  streamflow_metrics$peakflow_cfs[i]<-peakflow
+  date<-snotel_allyears[[i]][snotel_allyears[[i]]$swe == peak_swe,]$Date
+  snotel_metrics$peak_date[i]<- date[1]
+  
+  time_of_full_melt = snotel_allyears[[i]][snotel_allyears[[i]]$month > 2 & snotel_allyears[[i]]$swe == 0,]$Date[1]
+  
+  snotel_metrics$time_of_melt[i] <- time_of_full_melt 
   
   #Find mean slope from start to peak flow 
-  streamflow_metrics$meanslope[i]<- (peakflow - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$discharge_cfs)/ 
-    (watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$discharge_cfs == peakflow, ]$doy - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$doy)
+  snotel_metrics$slope_melt[i]<- (peak_swe - snotel_allyears[[i]][snotel_allyears[[i]]$Date == as.Date(time_of_full_melt), ]$swe)/ 
+    as.numeric(time_of_full_melt[1]- date[1])
   
-  max_ma30<-max(watershed_allyears.ls[[i]]$ma30, na.rm=T)
-  streamflow_metrics$max_ma30[i]<-max_ma30
+  #snotel_metrics$temp_avg[i] <- mean(c(snotel_ls[[i-1]][snotel_ls[[i -1]]$month > 11,]$temp_avg, 
+                                  #snotel_ls[[i]][snotel_ls[[i]]$month > 1 & snotel_ls[[i]]$month < 4,]$temp_avg))
+    
+  #snotel_metrics$temp_max_w[i] <- mean(c(snotel_ls[[i-1]][snotel_ls[[i -1]]$month > 11,]$temp_max, 
+                                      #snotel_ls[[i]][snotel_ls[[i]]$month > 1 & snotel_ls[[i]]$month < 4,]$temp_max))
   
-  streamflow_metrics$meanslope_ma[i]<- (max_ma30 - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == date, ]$ma30)/(na.omit(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$ma30 == max_ma30, ]$doy) - watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$Date == as.Date(date), ]$doy)
-  
-  streamflow_metrics$annual_tot[i]<-sum(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
-  streamflow_metrics$annual_mean[i]<-mean(watershed_allyears.ls[[i]]$discharge_cfs)*0.0283168
-  
-  
-  
+  snotel_metrics$precip_max[i] <- snotel_ls[[i]][snotel_ls[[i]]$swe == peak_swe,]$precip_acc
+  snotel_metrics$swe_precip[i]<-snotel_ls[[i]]$swe/snotel_ls[[i]]$precip_acc
 } #moving average mean slope is still not working 
 
-plot(streamflow_metrics$year, streamflow_metrics$peakflow_cfs, type = "l", xlab="Time", ylab='Streamflow (cfs)')
-abline(v= fire_year, col="red", lwd =3)
+
+snotel_metrics$precip_max[i] <- snotel_ls[[i]][snotel_ls[[i]]$swe == peak_swe,]$precip_acc
+
+
+snotel_metrics$peak_date<-as.Date(format(snotel_metrics$peak_date, format="%m-%d"), "%m-%d")
+snotel_metrics$time_of_melt<-as.Date(format(snotel_metrics$time_of_melt, format="%m-%d"), "%m-%d")
+
+#Mean date of spring onset (mean slope is pretty much the same)
+mean(na.omit(snotel_metrics[snotel_metrics$year <= fire_year,]$peak_date))
+mean(na.omit(snotel_metrics[snotel_metrics$year > fire_year & snotel_metrics$year <= fire_year+3,]$peak_date))
+
+mean(snotel_metrics[snotel_metrics$year <= fire_year,]$peakswe_mm)
+mean(na.omit(snotel_metrics[snotel_metrics$year > fire_year & snotel_metrics$year <= fire_year+3,]$peakswe_mm))
+
+#mean(na.omit(snotel_metrics_precip[snotel_metrics_precip$year <= fire_year,]$rration_maPeak))
+#mean(na.omit(snotel_metrics_precip[snotel_metrics_precip$year > fire_year & snotel_metrics_precip$year <= fire_year+3,]$rration_maPeak))
+
+#creating a factor for before fire and 3 years after fire
+
+snotel_metrics$before_after_f<- as.factor(with(snotel_metrics, ifelse( year <= fire_year, 'prefire', 
+                                                                               ifelse(year > fire_year & snotel_metrics$year <= fire_year+3, 'postfire_3yr', 
+                                                                                      'postfire'))))
+boxplot(peak_date ~ before_after_f, data = snotel_metrics)
+boxplot(peakswe_mm ~ before_after_f, data = snotel_metrics)
+boxplot(slope_melt ~ before_after_f, data = snotel_metrics)
+boxplot(time_of_melt ~ before_after_f, data = snotel_metrics)
+
+ggplot(snotel_metrics %>% filter(!is.na(before_after_f)), 
+       aes(x=before_after_f, y=swe_precip, fill=before_after_f)) + 
+  geom_boxplot(alpha=0.3) +
+  theme(legend.position="none") +
+  scale_fill_brewer(palette="Dark2") +
+  xlab( "Pre or Post Fire") + ylab('swe / precip') + ggtitle( "Snotel site") 
+
