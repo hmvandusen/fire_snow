@@ -104,8 +104,9 @@ watershdfire.df$TF<-floor(log10(watershdfire.df$GAGE_ID)) + 1 < 8
 
 #Add a zero to GAGE_ID if shorting than 8 digets
 watershdfire.df$GAGE_ID<-ifelse(floor(log10(watershdfire.df$GAGE_ID)) + 1 < 8, paste0("0", watershdfire.df$GAGE_ID), watershdfire.df$GAGE_ID)
+watershdfire.df2 <- subset(watershdfire.df, select = -c(X.3,X.2,X.1,X))
 
-
-write.csv(watershdfire.df, '/Volumes/MJ_INFEWS/Hannah Files/Fire_stream_flow/whole_watershedfire.csv')
+#have to write as txt file in order to not drop the leading 0 in the gage ID
+write.csv(watershdfire.df2, '/Volumes/MJ_INFEWS/Hannah Files/Fire_stream_flow/whole_watershedfire.txt')
 
 

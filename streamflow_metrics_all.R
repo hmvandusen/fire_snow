@@ -19,13 +19,22 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 #####
 #Objects that change:: additional object to change and save product at bottom of script
+watershdfire.df <- read.table('/Volumes/MJ_INFEWS/Hannah Files/Fire_stream_flow/whole_watershedfire.txt', sep=',', header = T)
 
+#adding leading 0 to ID values that are less than 8 digets
+watershdfire.df$GAGE_ID<-ifelse(floor(log10(watershdfire.df$GAGE_ID)) + 1 < 8, paste0("0", watershdfire.df$GAGE_ID), watershdfire.df$GAGE_ID)
+#create a list for stream metrics dataframe
+streamflow_metrics.ls<-list(NA)
+
+
+
+for (gage in 1:dim(watershdfire.df)[1]) { #dim(watershdfire.df)[1]
+
+  tryCatch({
 # Pull in gage for fire identifying parameters for data download
-siteNumber <- '12374250' # USGS gauge number
-fire_year <- 2007
+siteNumber <- watershdfire.df$GAGE_ID[gage] # USGS gauge number
+fire_year <- watershdfire.df$year[gage] 
 
-
-###Objects that do not change#### 
 
 #window to plot in function: suggested window year 1 after fire 
 plot_date<- c("2021-01-01", "2021-12-31")
@@ -51,8 +60,8 @@ watershed_name$doy <-lubridate::yday(watershed_name$Date) # add day of year col
 watershed_name<-addWaterYear(watershed_name)
 
 #Plots of all years from 2000 - 2021 and add in vertical line for fire
-plot(watershed_name$Date, watershed_name$discharge_cfs, type='l', ylab='Discharge (cfs)', xlab='Time (days)')
-abline(v=as.Date('2007-07-17'), col='red')
+#plot(watershed_name$Date, watershed_name$discharge_cfs, type='l', ylab='Discharge (cfs)', xlab='Time (days)')
+#abline(v=as.Date(fire_year), col='red')
 
 #Check for missing days, if so, add NA rows:
 if(as.numeric(diff(range(watershed_name$Date))) != (nrow(watershed_name)+1)){
@@ -76,52 +85,54 @@ watershed_ls<<-split(watershed_name, watershed_name$year.fact)
 ###
 
 eachyear<-function(yearperiod){
-
-#This is calculating the 30 day running average. This is one sided instead of two 
-rollmean <- function(x,n=30){stats::filter(x,rep(1/n,n), sides=1)}
-yearperiod$rollmean <- as.numeric(rollmean(yearperiod$discharge_cfs)) 
-
-#This calculates 30 day moving average 15 days on both sides
-ma30 <- function(x,n=30){stats::filter(x,rep(1/n,n), sides=2)}
-yearperiod$ma30 <- as.numeric(ma30(yearperiod$discharge_cfs)) 
-
-#Ploting 30-day rolling mean vs 30-day moving average
-## Moving average is much sooner than the rolling average. This will provide you with a very different date
-plot(yearperiod$Date,yearperiod$rollmean, type='l', col='red', xlim=as.Date(plot_date))
-lines(yearperiod$Date, yearperiod$ma30)
-
-##
-##Painter et al. Rising Limb
-#Running mean flow since 1 January
-
+  
+  #This is calculating the 30 day running average. This is one sided instead of two 
+  rollmean <- function(x,n=30){stats::filter(x,rep(1/n,n), sides=1)}
+  yearperiod$rollmean <- as.numeric(rollmean(yearperiod$discharge_cfs)) 
+  
+  #This calculates 30 day moving average 15 days on both sides
+  ma30 <- function(x,n=30){stats::filter(x,rep(1/n,n), sides=2)}
+  yearperiod$ma30 <- as.numeric(ma30(yearperiod$discharge_cfs)) 
+  
+  #Ploting 30-day rolling mean vs 30-day moving average
+  ## Moving average is much sooner than the rolling average. This will provide you with a very different date
+  plot(yearperiod$Date,yearperiod$rollmean, type='l', col='red', xlim=as.Date(plot_date))
+  lines(yearperiod$Date, yearperiod$ma30)
+  
+  ##
+  ##Painter et al. Rising Limb
+  #Running mean flow since 1 January
+  
   for (i in 1:dim(yearperiod)[1]) {
     yearperiod$runmeanPainter[i]<-sum(yearperiod$discharge_cfs[1:i])/i
   }
-
-
-plot(yearperiod$Date,yearperiod$rollmean, type='l', col='red', xlim=as.Date(plot_date), ylim = c(0,5000))
-lines(yearperiod$Date, yearperiod$ma30)
-lines(yearperiod$Date, yearperiod$discharge_cfs, col='blue')
-lines(yearperiod$Date, yearperiod$runmeanPainter, col='green')
-
-##Find percent change of Painter running mean:
-
-for (i in 2:dim(yearperiod)[1]) {
-  yearperiod$perchange[1]<-NA
-  yearperiod$perchange[i]<- ((yearperiod$runmeanPainter)[i]/yearperiod$runmeanPainter[i-1]*100)-100
+  
+  
+  plot(yearperiod$Date,yearperiod$rollmean, type='l', col='red', xlim=as.Date(plot_date), ylim = c(0,5000))
+  lines(yearperiod$Date, yearperiod$ma30)
+  lines(yearperiod$Date, yearperiod$discharge_cfs, col='blue')
+  lines(yearperiod$Date, yearperiod$runmeanPainter, col='green')
+  
+  ##Find percent change of Painter running mean:
+  
+  for (i in 2:dim(yearperiod)[1]) {
+    yearperiod$perchange[1]<-NA
+    yearperiod$perchange[i]<- ((yearperiod$runmeanPainter)[i]/yearperiod$runmeanPainter[i-1]*100)-100
+    
+  }
+  
+  plot(yearperiod$Date, yearperiod$perchange, type='l', col='red', xlim=as.Date(plot_date), ylim = c(0,20))
+  abline(h=1)
+  
+  assign(paste0("watershed_", yearperiod$year[1]), yearperiod, envir = globalenv())
   
 }
 
-plot(yearperiod$Date, yearperiod$perchange, type='l', col='red', xlim=as.Date(plot_date), ylim = c(0,20))
-abline(h=1)
-
-assign(paste0("watershed_", yearperiod$year[1]), yearperiod, envir = globalenv())
-
-}
-
 ###Application of functions 
+
 watershed_allyears<-streamflow_analysis(siteNumber, parameterCd, startDate, endDate)
 watershed_allyears.ls<-lapply(watershed_allyears, function(y) eachyear(y))
+
 
 #Creating a usable dataframe and following for loop
 streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA), peakflow_cfs=NA, meanslope=NA, meanslope_ma=NA)
@@ -129,7 +140,7 @@ streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA),
 for (i in 1:length(watershed_allyears.ls)) {
   streamflow_metrics$year[i]<-watershed_allyears.ls[[i]]$year[1]
   
-  date<-watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$perchange >= 1 & watershed_allyears.ls[[i]]$month > 2  ,]$Date[1]
+  date<-na.omit(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$perchange >= 1 & watershed_allyears.ls[[i]]$month > 2  ,])$Date[1]
   streamflow_metrics$springonset_date[i]<- date[1]
   
   peakflow<-max(watershed_allyears.ls[[i]]$discharge_cfs)
@@ -155,8 +166,32 @@ for (i in 1:length(watershed_allyears.ls)) {
 
 } #moving average mean slope is still not working 
 
-plot(streamflow_metrics$year, streamflow_metrics$peakflow_cfs, type = "l", xlab="Time", ylab='Streamflow (cfs)')
-abline(v= fire_year, col="red", lwd =3)
+streamflow_metrics$before_after_f<- as.factor(with(streamflow_metrics, ifelse( year <= fire_year, 'prefire', 
+                                                                               ifelse(year > fire_year & streamflow_metrics$year <= fire_year+3, 'postfire_3yr', 
+                                                                                      'postfire'))))
+streamflow_metrics$springonset_md<-as.Date(format(streamflow_metrics$springonset_date, format="%m-%d"), "%m-%d")
+
+streamflow_metrics$GAGE_ID <- siteNumber
+streamflow_metrics$fire_year <- fire_year
+streamflow_metrics$snow <- watershdfire.df$snow[gage]
+streamflow_metrics$percentageFire <- watershdfire.df$percentageFire[gage]
+streamflow_metrics$Hseverity <- watershdfire.df$Hseverity[gage]
+
+streamflow_metrics.ls[[gage]]<- streamflow_metrics
+rm(list=ls(pattern="watershed_"))}, 
+
+  error = function(e){
+    message(paste("An error occurred for item", gage, conditionMessage(e),":\n"), e)})
+}
+
+#These gages are not active after 2000
+numbers<-which(lengths(streamflow_metrics.ls) == 0)
+inactive_gages<-vector(mode = 'character')
+for (i in 1:length(numbers)){
+  inactive_gages[i]<-watershdfire.df$GAGE_ID[numbers[i]]
+}
+
+streammetrics.df<-rbindlist(streamflow_metrics.ls)
 
 
 ###SAVE streamflow_metrics table as a more specific name!####
@@ -171,7 +206,6 @@ abline(v= fire_year, col="red", lwd =3)
 #Notes:
 #Wrong year on springonset_md, but it don't matter for plotting purposes: just want month and day
 #Red Post fire, Blue Pre-Fire
-streamflow_metrics$springonset_md<-as.Date(format(streamflow_metrics$springonset_date, format="%m-%d"), "%m-%d")
 plot(streamflow_metrics$springonset_md, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
      pch=19,  xlab = "Day of spring onset", ylab="Mean hydrograph slope (cfs/day)", cex= 4)
 plot(streamflow_metrics$peakflow_cfs, streamflow_metrics$meanslope, col = ifelse(streamflow_metrics$year>fire_year, 'red','blue'), 
@@ -246,6 +280,5 @@ ggplot(streamflow_metrics %>% filter(!is.na(before_after_f)),
   scale_fill_brewer(palette="Dark2") +
   xlab( "Pre or Post Fire") + ylab('baseflow') 
 
-
-  
-  
+ggplot(streammetrics.df[1:400,], aes(x=GAGE_ID, y=peakflow_cms, fill=before_after_f)) + 
+  geom_boxplot()

@@ -6,6 +6,9 @@ library(fpp)
 library(dplyr) 
 library(reshape2) 
 library(data.table)
+library(dataRetrieval)
+library(ggplot2)
+fire_year<- 2007
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) 
 
 Snotel_Johnsoncreek <- read_csv("https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customSingleStationReport/daily/439:ID:SNTL%7Cid=%22%22%7Cname/POR_BEGIN,POR_END/WTEQ::value,PREC::value,TMAX::value,TMIN::value,TAVG::value,PRCP::value", 
@@ -208,11 +211,11 @@ boxplot(slope_melt ~ before_after_f, data = snotel_metrics)
 boxplot(time_of_melt ~ before_after_f, data = snotel_metrics)
 
 ggplot(snotel_metrics %>% filter(!is.na(before_after_f)), 
-       aes(x=before_after_f, y=max_dryd, fill=before_after_f)) + 
+       aes(x=before_after_f, y=max_dry, fill=before_after_f)) + 
   geom_boxplot(alpha=0.3) +
   theme(legend.position="none") +
   scale_fill_brewer(palette="Dark2") +
-  xlab( "Pre or Post Fire") + ylab('midwintermelt loss') + ggtitle( "Snotel site") 
+  xlab( "Pre or Post Fire") + ylab('max dry days') + ggtitle( "Snotel site") 
 
 
  
