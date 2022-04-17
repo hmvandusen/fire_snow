@@ -32,7 +32,7 @@ fire<-allfires[allfires$Incid_Name == name]
 plot(fire)
 
 #watershed shapefile
-allwatersheds<-vect(watershed)
+allwatersheds<-vect(watershed)filez[1])
 watershed<-allwatersheds[allwatersheds$GAGE_ID == watershed_gageID]
 plot(watershed)
 area<-watershed$AREA #units are in meters 

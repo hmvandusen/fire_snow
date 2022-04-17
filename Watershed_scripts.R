@@ -69,7 +69,7 @@ fire_per<-data.frame(length =  1: length(watershds), GAGE_ID = NA, fire_percenta
 
 for (i in 1:length(watershds)) {
   intersecttst<-terra::intersect(watershds[i], fires)
-  fire_percentage<-max(expanse(intersecttst))/expanse(watershds[i])
+  fire_percentage<-max(expanse(intersecttst))/expanse(watershds[i]) #This is saying the max intercept 
   fire_per$fire_percentage[i]<-fire_percentage
   fire_per$GAGE_ID[i]<-watershds$GAGE_ID[i]
 }
