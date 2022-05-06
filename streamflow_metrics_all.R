@@ -31,9 +31,10 @@ watershdfire.df$GAGE_ID<-ifelse(floor(log10(watershdfire.df$GAGE_ID)) + 1 < 8, p
 #create a list for stream metrics dataframe
 streamflow_metrics.ls<-list(NA)
 
+siteNumber= '13313000'
+fire_year=2007
 
-
-for (gage in 1:dim(watershdfire.df)[1]) { #dim(watershdfire.df)[1]
+for (gage in 1:dim(watershdfire.df)[1]) { #
 
   tryCatch({
 # Pull in gage for fire identifying parameters for data download
@@ -44,8 +45,8 @@ fire_year <- watershdfire.df$year[gage]
 #window to plot in function: suggested window year 1 after fire 
 plot_date<- c("2021-01-01", "2021-12-31")
 parameterCd <- "00060"  # mean daily discharge in cfs
-startDate <- "1985-01-01" # period of record of MODIS
-endDate <- "2021-12-31" # Current year
+startDate <- "1959-10-01" # period of record of MODIS
+endDate <- "2022-09-30" # Current year
 
 #### Cleaning in Gage data 
 
@@ -81,7 +82,7 @@ if(as.numeric(diff(range(watershed_name$Date))) != (nrow(watershed_name)+1)){
     arrange(Date)
 }
 
-watershed_name$year.fact<-as.factor(watershed_name$year)
+watershed_name$year.fact<-as.factor(watershed_name$waterYear)
 watershed_ls<<-split(watershed_name, watershed_name$year.fact)
 }
 
@@ -140,9 +141,10 @@ watershed_allyears.ls<-lapply(watershed_allyears, function(y) eachyear(y))
 
 
 #Creating a usable dataframe and following for loop
-streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA), peakflow_cfs=NA, meanslope=NA, meanslope_ma=NA)
+nyear<-length(watershed_allyears.ls)
+#streamflow_metrics<-data.frame(time= 1:22,year=NA, springonset_date=as.Date(NA), peakflow_cfs=NA, meanslope=NA, meanslope_ma=NA)
 
-streamflow_metrics<-data.frame(time= 1985:2021, year=NA, 
+streamflow_metrics<-data.frame(time= 1960:2022, year=NA, 
                                springonset_date=as.Date(NA), peakflow_cfs=NA, 
                                meanslope=NA, meanslope_ma=NA, annual_tot = NA, 
                                annual_mean=NA, baseflow=NA, peakflow_cms=NA, max_ma30 =NA
@@ -151,9 +153,9 @@ streamflow_metrics<-data.frame(time= 1985:2021, year=NA,
 for (i in 1:length(watershed_allyears.ls)) {
   
   numrow<-nrow(streamflow_metrics[streamflow_metrics$time <= names(watershed_allyears.ls)[i],])
-  streamflow_metrics[numrow,]$year<-watershed_allyears.ls[[i]]$year[i]
+  streamflow_metrics[numrow,]$year<-watershed_allyears.ls[[i]]$waterYear[i]
   
-  date<-na.omit(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$perchange >= 1 & watershed_allyears.ls[[i]]$month > 2  ,])$Date[1]
+  date<-na.omit(watershed_allyears.ls[[i]][watershed_allyears.ls[[i]]$perchange >= 1 & watershed_allyears.ls[[i]]$month > 2 & watershed_allyears.ls[[i]]$month < 10 ,])$Date[1]
   streamflow_metrics$springonset_date[numrow]<- date[1]
   
   peakflow<-max(watershed_allyears.ls[[i]]$discharge_cfs)
@@ -198,7 +200,7 @@ rm(list=ls(pattern="watershed_"))},
 
   error = function(e){
     message(paste("An error occurred for item", gage, conditionMessage(e),":\n"), e)})
-}
+} #dim(watershdfire.df)[1]
 
 #These gages are not active after 2000
 numbers<-which(lengths(streamflow_metrics.ls) == 0)
